@@ -39,7 +39,7 @@ export default function PortfolioShowcase({
 
   const scrollSlider = (direction: 'left' | 'right') => {
     if (sliderRef.current) {
-      const scrollAmount = direction === 'left' ? -360 : 360;
+      const scrollAmount = direction === 'left' ? -304 : 304;
       sliderRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
     }
   };
@@ -81,11 +81,11 @@ export default function PortfolioShowcase({
         </div>
       </div>
 
-      {/* Horizontal Slider: Smooth, fluid, no aggressive snap */}
+      {/* Horizontal Slider: Centered Card on Mobile, Smooth Carousel on Desktop */}
       <div className="w-full">
         <div
           ref={sliderRef}
-          className="flex gap-8 sm:gap-10 md:gap-12 overflow-x-auto px-4 sm:px-8 md:px-[max(1rem,calc((100vw-980px)/2))] pb-6 pt-2 no-scrollbar scroll-smooth"
+          className="flex gap-6 sm:gap-8 md:gap-10 overflow-x-auto px-[calc((100vw-280px)/2)] sm:px-8 md:px-[max(1.5rem,calc((100vw-980px)/2))] snap-x snap-mandatory md:snap-none pb-6 pt-2 no-scrollbar scroll-smooth"
         >
           {filteredPortfolios.map((item) => {
             const waUrl = formatWhatsAppUrl(
@@ -96,7 +96,7 @@ export default function PortfolioShowcase({
             return (
               <div
                 key={item.id}
-                className="shrink-0 w-[270px] sm:w-[290px] md:w-[310px] flex flex-col justify-between"
+                className="shrink-0 w-[280px] sm:w-[290px] md:w-[310px] snap-center md:snap-align-none flex flex-col justify-between"
               >
                 {/* Bagian Atas: Media & Teks Alami Sesuai Screenshot Apple */}
                 <div>
