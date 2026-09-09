@@ -137,6 +137,15 @@ export default function ProductModal({
     getProductConsultationMessage(product.name)
   );
 
+  const ctaRawLink = product.button_link?.trim();
+  const ctaLink = ctaRawLink
+    ? (ctaRawLink.startsWith('http://') || ctaRawLink.startsWith('https://') || ctaRawLink.startsWith('/') || ctaRawLink.startsWith('#')
+        ? ctaRawLink
+        : `https://${ctaRawLink}`)
+    : waUrl;
+  const isExternalCta = !ctaRawLink || ctaLink.startsWith('http://') || ctaLink.startsWith('https://');
+  const ctaButtonText = product.button_text?.trim() || 'Pilih Paket Ini';
+
   return (
     <>
       <div
@@ -303,7 +312,9 @@ export default function ProductModal({
           {/* Pricing Badge */}
           {product.show_price && product.price ? (
             <div className="inline-block py-1.5 px-3 rounded-[6px] bg-[#F5F5F7] text-[#0B0F19] font-semibold text-[17px] mb-4">
-              Rp {Number(product.price).toLocaleString('id-ID')}
+              {product.harga_maks && Number(product.harga_maks) > Number(product.price)
+                ? `Rp ${Number(product.price).toLocaleString('id-ID')} - ${Number(product.harga_maks).toLocaleString('id-ID')}`
+                : `${product.is_starting_price ? 'Mulai ' : ''}Rp ${Number(product.price).toLocaleString('id-ID')}`}
               <span className="text-xs font-normal text-[#6B7280] ml-1">/ project</span>
             </div>
           ) : (
@@ -347,12 +358,12 @@ export default function ProductModal({
           {/* CTA Button */}
           <div className="flex flex-col sm:flex-row items-center gap-3">
             <a
-              href={waUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={ctaLink}
+              target={isExternalCta ? '_blank' : undefined}
+              rel={isExternalCta ? 'noopener noreferrer' : undefined}
               className="w-full inline-flex items-center justify-center py-2.5 px-5 text-[14px] font-semibold text-white bg-[#0B0F19] hover:bg-black active:scale-[0.98] rounded-full transition-all"
             >
-              <span>Pilih Paket Ini</span>
+              <span>{ctaButtonText}</span>
             </a>
             <button
               onClick={onClose}

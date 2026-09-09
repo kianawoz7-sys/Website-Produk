@@ -21,7 +21,11 @@ export default function AdminProdukPage() {
   const [shortDesc, setShortDesc] = useState('');
   const [fullDesc, setFullDesc] = useState('');
   const [price, setPrice] = useState<string>('');
+  const [hargaMaks, setHargaMaks] = useState<string>('');
   const [showPrice, setShowPrice] = useState(true);
+  const [isStartingPrice, setIsStartingPrice] = useState(false);
+  const [buttonText, setButtonText] = useState('Pilih Paket');
+  const [buttonLink, setButtonLink] = useState('');
   const [featuresText, setFeaturesText] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [images, setImages] = useState<string[]>([]);
@@ -62,7 +66,11 @@ export default function AdminProdukPage() {
     setShortDesc('');
     setFullDesc('');
     setPrice('');
+    setHargaMaks('');
     setShowPrice(true);
+    setIsStartingPrice(false);
+    setButtonText('Pilih Paket');
+    setButtonLink('');
     setFeaturesText('');
     setImageUrl('');
     setImages([]);
@@ -80,7 +88,11 @@ export default function AdminProdukPage() {
     setShortDesc(p.short_description || '');
     setFullDesc(p.full_description || '');
     setPrice(p.price !== undefined && p.price !== null ? String(p.price) : '');
+    setHargaMaks(p.harga_maks !== undefined && p.harga_maks !== null ? String(p.harga_maks) : '');
     setShowPrice(p.show_price);
+    setIsStartingPrice(Boolean(p.is_starting_price));
+    setButtonText(p.button_text || 'Pilih Paket');
+    setButtonLink(p.button_link || '');
     setFeaturesText((p.features || []).join('\n'));
     setImageUrl(p.image_url || '');
     setImages(
@@ -199,7 +211,11 @@ export default function AdminProdukPage() {
       short_description: shortDesc,
       full_description: fullDesc,
       price: price ? parseFloat(price) : null,
+      harga_maks: hargaMaks ? parseFloat(hargaMaks) : null,
       show_price: showPrice,
+      is_starting_price: isStartingPrice,
+      button_text: buttonText.trim() || 'Pilih Paket',
+      button_link: buttonLink.trim() || null,
       features: parsedFeatures,
       image_url: primaryImage,
       images: images.length > 0 ? images : primaryImage ? [primaryImage] : [],
@@ -229,8 +245,12 @@ export default function AdminProdukPage() {
       fetch('/api/revalidate', { method: 'POST' }).catch(() => {});
       setMessage({ text: 'Paket produk berhasil disimpan!', type: 'success' });
     } catch (err: unknown) {
+      const errMsg = (err as Error)?.message || '';
+      const isMissingCol = errMsg.includes('column') || errMsg.includes('PGRST204');
       setMessage({
-        text: `Gagal menyimpan: ${(err as Error)?.message}`,
+        text: isMissingCol
+          ? `Kolom baru belum ada di Supabase. Silakan jalankan query di file supabase/migration_add_harga_maks.sql pada SQL Editor Supabase: ${errMsg}`
+          : `Gagal menyimpan: ${errMsg}`,
         type: 'error',
       });
     }
@@ -366,7 +386,9 @@ export default function AdminProdukPage() {
                     <td className="px-6 py-4">
                       {p.show_price && p.price ? (
                         <span className="font-medium text-primary">
-                          Rp {Number(p.price).toLocaleString('id-ID')}
+                          {p.harga_maks && Number(p.harga_maks) > Number(p.price)
+                            ? `Rp ${Number(p.price).toLocaleString('id-ID')} - ${Number(p.harga_maks).toLocaleString('id-ID')}`
+                            : `${p.is_starting_price ? 'Mulai ' : ''}Rp ${Number(p.price).toLocaleString('id-ID')}`}
                         </span>
                       ) : (
                         <span className="text-muted text-[13px]">Custom Quote</span>
@@ -464,7 +486,7 @@ export default function AdminProdukPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-[13px] font-medium text-primary mb-1">
                     Harga (Rp)
@@ -474,6 +496,19 @@ export default function AdminProdukPage() {
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
                     placeholder="Contoh: 1500000"
+                    className="w-full px-3.5 py-2.5 rounded-xs bg-surface border border-black/[0.08] text-[14px] text-primary focus:bg-white focus:border-accent focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[13px] font-medium text-primary mb-1">
+                    Harga Maks (Rp) <span className="text-muted font-normal text-[11px]">(Opsional)</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={hargaMaks}
+                    onChange={(e) => setHargaMaks(e.target.value)}
+                    placeholder="Contoh: 3000000"
                     className="w-full px-3.5 py-2.5 rounded-xs bg-surface border border-black/[0.08] text-[14px] text-primary focus:bg-white focus:border-accent focus:outline-none"
                   />
                 </div>
@@ -491,7 +526,7 @@ export default function AdminProdukPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-6 pt-1">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1">
                 <label className="inline-flex items-center gap-2 text-[13px] text-primary cursor-pointer">
                   <input
                     type="checkbox"
@@ -505,12 +540,55 @@ export default function AdminProdukPage() {
                 <label className="inline-flex items-center gap-2 text-[13px] text-primary cursor-pointer">
                   <input
                     type="checkbox"
+                    checked={isStartingPrice}
+                    onChange={(e) => setIsStartingPrice(e.target.checked)}
+                    className="rounded text-accent focus:ring-accent w-4 h-4"
+                  />
+                  <span>Harga Mulai Dari (Prefix &quot;Mulai&quot;)</span>
+                </label>
+
+                <label className="inline-flex items-center gap-2 text-[13px] text-primary cursor-pointer">
+                  <input
+                    type="checkbox"
                     checked={isVisible}
                     onChange={(e) => setIsVisible(e.target.checked)}
                     className="rounded text-accent focus:ring-accent w-4 h-4"
                   />
                   <span>Status: Tampilkan di publik</span>
                 </label>
+              </div>
+
+              {/* Custom Action Button & Link Configuration */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3.5 rounded-[10px] bg-surface border border-black/[0.06]">
+                <div>
+                  <label className="block text-[13px] font-medium text-primary mb-1">
+                    Teks Tombol Aksi
+                  </label>
+                  <input
+                    type="text"
+                    value={buttonText}
+                    onChange={(e) => setButtonText(e.target.value)}
+                    placeholder="Pilih Paket"
+                    className="w-full px-3.5 py-2 rounded-xs bg-white border border-black/[0.08] text-[13px] text-primary focus:border-accent focus:outline-none"
+                  />
+                  <p className="text-[11px] text-muted mt-1">Default: &quot;Pilih Paket&quot;</p>
+                </div>
+
+                <div>
+                  <label className="block text-[13px] font-medium text-primary mb-1">
+                    Link Tujuan Tombol (Opsional)
+                  </label>
+                  <input
+                    type="text"
+                    value={buttonLink}
+                    onChange={(e) => setButtonLink(e.target.value)}
+                    placeholder="https://wa.me/... atau link eksternal"
+                    className="w-full px-3.5 py-2 rounded-xs bg-white border border-black/[0.08] text-[13px] font-mono text-primary focus:border-accent focus:outline-none"
+                  />
+                  <p className="text-[11px] text-muted mt-1">
+                    Kosongkan untuk otomatis checkout WhatsApp.
+                  </p>
+                </div>
               </div>
 
               <div>

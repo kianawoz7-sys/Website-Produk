@@ -52,6 +52,15 @@ export default function ProductCatalog({
               getProductConsultationMessage(product.name)
             );
 
+            const rawLink = product.button_link?.trim();
+            const targetLink = rawLink
+              ? (rawLink.startsWith('http://') || rawLink.startsWith('https://') || rawLink.startsWith('/') || rawLink.startsWith('#')
+                  ? rawLink
+                  : `https://${rawLink}`)
+              : waUrl;
+            const isExternal = !rawLink || targetLink.startsWith('http://') || targetLink.startsWith('https://');
+            const buttonText = product.button_text?.trim() || 'Pilih Paket';
+
             return (
               <div
                 key={product.id}
@@ -80,7 +89,9 @@ export default function ProductCatalog({
                     </h3>
                     {product.show_price && product.price ? (
                       <span className="text-[15px] font-semibold text-primary shrink-0">
-                        Rp {Number(product.price).toLocaleString('id-ID')}
+                        {product.harga_maks && Number(product.harga_maks) > Number(product.price)
+                          ? `Rp ${Number(product.price).toLocaleString('id-ID')} - ${Number(product.harga_maks).toLocaleString('id-ID')}`
+                          : `${product.is_starting_price ? 'Mulai ' : ''}Rp ${Number(product.price).toLocaleString('id-ID')}`}
                       </span>
                     ) : (
                       <span className="text-[13px] font-medium text-accent shrink-0">
@@ -123,12 +134,12 @@ export default function ProductCatalog({
                   </button>
 
                   <a
-                    href={waUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={targetLink}
+                    target={isExternal ? '_blank' : undefined}
+                    rel={isExternal ? 'noopener noreferrer' : undefined}
                     className="inline-flex items-center justify-center px-4 py-1.5 text-[13px] font-semibold text-white bg-[#0B0F19] hover:bg-black active:scale-[0.97] rounded-full transition-all shadow-xs"
                   >
-                    <span>Pilih Paket</span>
+                    <span>{buttonText}</span>
                   </a>
                 </div>
               </div>

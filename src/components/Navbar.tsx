@@ -11,41 +11,55 @@ interface NavbarProps {
 
 export default function Navbar({ whatsappNumber = '6281234567890' }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [hidden, setHidden] = useState(false);
-  const lastScrollY = useRef(0);
+  const [scrolled, setScrolled] = useState(false);
+  const navRef = useRef<HTMLElement>(null);
   const waUrl = formatWhatsAppUrl(whatsappNumber, getGeneralConsultationMessage());
 
   useEffect(() => {
-    // Reset scroll posisi ke paling atas saat website dimuat / direload
-    if ('scrollRestoration' in window.history) {
-      window.history.scrollRestoration = 'manual';
-    }
-    window.scrollTo(0, 0);
-
     const handleScroll = () => {
-      const currentY = window.scrollY;
-      // Hide when scrolling down past 60px, show when scrolling up
-      if (currentY > 60 && currentY > lastScrollY.current) {
-        setHidden(true);
-        setIsOpen(false);
-      } else {
-        setHidden(false);
-      }
-      lastScrollY.current = currentY;
+      setScrolled(window.scrollY > 20);
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Click outside to close mobile dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
+
   return (
     <header
-      className={`fixed top-3 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-24px)] max-w-[600px] transition-all duration-300 ${
-        hidden ? '-translate-y-[calc(100%+24px)] opacity-0' : 'translate-y-0 opacity-100'
-      }`}
+      ref={navRef}
+      className="fixed top-3 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-24px)] max-w-[600px] transition-all duration-300"
     >
       {/* Capsule Nav */}
-      <div className="flex items-center justify-between h-12 px-5 rounded-full bg-white/70 backdrop-blur-xl border border-black/[0.06] shadow-[0_2px_20px_rgba(0,0,0,0.06)]">
+      <div className={`flex items-center justify-between h-12 px-5 rounded-full backdrop-blur-xl transition-all duration-300 ${
+        scrolled
+          ? 'bg-white/90 border border-black/[0.08] shadow-[0_4px_24px_rgba(0,0,0,0.08)]'
+          : 'bg-white/70 border border-black/[0.06] shadow-[0_2px_20px_rgba(0,0,0,0.06)]'
+      }`}>
         {/* Brand — tanpa logo K */}
         <Link
           href="/"

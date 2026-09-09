@@ -40,6 +40,15 @@ export default async function ProductDetailPage({ params }: PageProps) {
     getProductConsultationMessage(product.name)
   );
 
+  const ctaRawLink = product.button_link?.trim();
+  const ctaLink = ctaRawLink
+    ? (ctaRawLink.startsWith('http://') || ctaRawLink.startsWith('https://') || ctaRawLink.startsWith('/') || ctaRawLink.startsWith('#')
+        ? ctaRawLink
+        : `https://${ctaRawLink}`)
+    : waUrl;
+  const isExternalCta = !ctaRawLink || ctaLink.startsWith('http://') || ctaLink.startsWith('https://');
+  const ctaButtonText = product.button_text?.trim() || 'Pilih Paket Ini';
+
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar whatsappNumber={settings.whatsapp_number} />
@@ -73,7 +82,9 @@ export default async function ProductDetailPage({ params }: PageProps) {
               <div className="pt-1">
                 {product.show_price && product.price ? (
                   <div className="inline-block py-1.5 px-4 rounded-[8px] bg-white border border-black/[0.06] text-primary font-semibold text-[20px]">
-                    Rp {Number(product.price).toLocaleString('id-ID')}
+                    {product.harga_maks && Number(product.harga_maks) > Number(product.price)
+                      ? `Rp ${Number(product.price).toLocaleString('id-ID')} - ${Number(product.harga_maks).toLocaleString('id-ID')}`
+                      : `${product.is_starting_price ? 'Mulai ' : ''}Rp ${Number(product.price).toLocaleString('id-ID')}`}
                     <span className="text-xs font-normal text-muted ml-1">/ project</span>
                   </div>
                 ) : (
@@ -120,12 +131,12 @@ export default async function ProductDetailPage({ params }: PageProps) {
             {/* CTA action */}
             <div className="mt-8 pt-6 flex flex-col sm:flex-row items-center gap-4">
               <a
-                href={waUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={ctaLink}
+                target={isExternalCta ? '_blank' : undefined}
+                rel={isExternalCta ? 'noopener noreferrer' : undefined}
                 className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3 text-[14px] font-semibold text-white bg-[#0B0F19] hover:bg-black active:scale-[0.98] rounded-full transition-all"
               >
-                <span>Pilih Paket Ini</span>
+                <span>{ctaButtonText}</span>
               </a>
 
               <Link

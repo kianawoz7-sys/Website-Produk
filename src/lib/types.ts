@@ -5,7 +5,11 @@ export interface Product {
   short_description?: string | null;
   full_description?: string | null;
   price?: number | null;
+  harga_maks?: number | null;
   show_price: boolean;
+  is_starting_price?: boolean;
+  button_text?: string | null;
+  button_link?: string | null;
   features?: string[] | null;
   image_url?: string | null;
   images?: string[] | null;

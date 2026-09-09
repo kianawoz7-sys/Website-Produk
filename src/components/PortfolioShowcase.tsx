@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { ExternalLink, ChevronLeft, ChevronRight, Layers, Maximize2 } from 'lucide-react';
 import { PortfolioProject } from '@/lib/types';
@@ -37,6 +37,22 @@ export default function PortfolioShowcase({
     return portfolios.filter((p) => p.category === activeCategory);
   }, [portfolios, activeCategory]);
 
+  // When activeCategory === 'Semua', show all categories.
+  // When activeCategory !== 'Semua', show only ['Semua', activeCategory].
+  const displayedCategories = useMemo(() => {
+    if (activeCategory === 'Semua') {
+      return categories;
+    }
+    return ['Semua', activeCategory];
+  }, [categories, activeCategory]);
+
+  // Reset slider position whenever category changes
+  useEffect(() => {
+    if (sliderRef.current) {
+      sliderRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+    }
+  }, [activeCategory]);
+
   const scrollSlider = (direction: 'left' | 'right') => {
     if (sliderRef.current) {
       const scrollAmount = direction === 'left' ? -304 : 304;
@@ -61,61 +77,89 @@ export default function PortfolioShowcase({
           </p>
         </div>
 
-        {/* Filter Category Pills di Tengah */}
-        <div className="flex items-center justify-center gap-2 overflow-x-auto pb-4 no-scrollbar mb-10">
-          {categories.map((cat) => {
-            const isActive = activeCategory === cat;
-            return (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`px-4 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap transition-all ${isActive
-                    ? 'bg-primary text-white shadow-sm'
-                    : 'bg-white text-muted hover:text-primary hover:bg-neutral-100 border border-black/[0.06]'
+        {/* Filter Category Pills */}
+        <div className="w-full mb-10">
+          <div
+            className={`flex items-center gap-2 pb-3 sm:pb-0 px-4 sm:px-0 no-scrollbar transition-all duration-300 ${
+              activeCategory === 'Semua'
+                ? 'overflow-x-auto sm:overflow-visible sm:flex-wrap sm:justify-center'
+                : 'justify-center'
+            }`}
+          >
+            {displayedCategories.map((cat) => {
+              const isActive = activeCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(activeCategory === cat ? 'Semua' : cat)}
+                  className={`px-4 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap shrink-0 transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-primary text-white shadow-sm ring-2 ring-primary/20 scale-[1.02]'
+                      : 'bg-white text-muted hover:text-primary hover:bg-neutral-100 border border-black/[0.06]'
                   }`}
-              >
-                {cat}
-              </button>
-            );
-          })}
+                  title={isActive && cat !== 'Semua' ? 'Klik untuk kembali ke Semua' : undefined}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {/* Horizontal Slider: Centered Card on Mobile, Smooth Carousel on Desktop */}
       <div className="w-full">
-        <div
-          ref={sliderRef}
-          className="flex gap-6 sm:gap-8 md:gap-10 overflow-x-auto px-[calc((100vw-280px)/2)] sm:px-8 md:px-[max(1.5rem,calc((100vw-980px)/2))] snap-x snap-mandatory md:snap-none pb-6 pt-2 no-scrollbar scroll-smooth"
-        >
-          {filteredPortfolios.map((item) => (
-            <PortfolioCard
-              key={item.id}
-              item={item}
-              onSelect={setSelectedProject}
-              whatsappNumber={whatsappNumber}
-            />
-          ))}
-        </div>
-
-        {/* Apple Style Floating Circular Navigation Buttons (Persis Screenshot Referensi) */}
-        <div className="apple-container flex items-center justify-end pt-4 pb-2">
-          <div className="flex items-center gap-3">
+        {filteredPortfolios.length === 0 ? (
+          <div className="text-center py-12 px-4">
+            <p className="text-[15px] text-muted mb-4">
+              Belum ada portofolio untuk kategori ini.
+            </p>
             <button
-              onClick={() => scrollSlider('left')}
-              aria-label="Sebelumnya"
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#E8E8ED] hover:bg-[#DCDCE2] active:scale-90 text-[#424245] hover:text-[#1D1D1F] flex items-center justify-center transition-all duration-200 shadow-sm cursor-pointer select-none"
+              onClick={() => setActiveCategory('Semua')}
+              className="px-5 py-2 rounded-full bg-primary text-white text-[13px] font-medium hover:bg-black transition-colors"
             >
-              <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
-            </button>
-            <button
-              onClick={() => scrollSlider('right')}
-              aria-label="Selanjutnya"
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#E8E8ED] hover:bg-[#DCDCE2] active:scale-90 text-[#424245] hover:text-[#1D1D1F] flex items-center justify-center transition-all duration-200 shadow-sm cursor-pointer select-none"
-            >
-              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
+              Lihat Semua Portofolio
             </button>
           </div>
-        </div>
+        ) : (
+          <>
+            <div
+              ref={sliderRef}
+              className="flex gap-6 sm:gap-8 md:gap-10 overflow-x-auto px-[calc((100vw-280px)/2)] sm:px-8 md:px-[max(1.5rem,calc((100vw-980px)/2))] snap-x snap-mandatory md:snap-none pb-6 pt-2 no-scrollbar scroll-smooth"
+            >
+              {filteredPortfolios.map((item) => (
+                <PortfolioCard
+                  key={item.id}
+                  item={item}
+                  onSelect={setSelectedProject}
+                  whatsappNumber={whatsappNumber}
+                />
+              ))}
+            </div>
+
+            {/* Apple Style Floating Circular Navigation Buttons (Persis Screenshot Referensi) */}
+            {filteredPortfolios.length > 1 && (
+              <div className="apple-container flex items-center justify-end pt-4 pb-2">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => scrollSlider('left')}
+                    aria-label="Sebelumnya"
+                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#E8E8ED] hover:bg-[#DCDCE2] active:scale-90 text-[#424245] hover:text-[#1D1D1F] flex items-center justify-center transition-all duration-200 shadow-sm cursor-pointer select-none"
+                  >
+                    <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
+                  </button>
+                  <button
+                    onClick={() => scrollSlider('right')}
+                    aria-label="Selanjutnya"
+                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#E8E8ED] hover:bg-[#DCDCE2] active:scale-90 text-[#424245] hover:text-[#1D1D1F] flex items-center justify-center transition-all duration-200 shadow-sm cursor-pointer select-none"
+                  >
+                    <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Apple Quick View Modal untuk Portofolio Produk */}
