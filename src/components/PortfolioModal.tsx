@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { X, Check, ExternalLink, Layers, Maximize2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PortfolioProject } from '@/lib/types';
@@ -21,6 +21,7 @@ export default function PortfolioModal({
   const [imageRatios, setImageRatios] = useState<Record<string, boolean>>({});
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const thumbsRef = useRef<HTMLDivElement>(null);
 
   // Extract all available images
   const imageList = useMemo(() => {
@@ -93,6 +94,42 @@ export default function PortfolioModal({
     };
   }, [project, onClose, isFullscreen, imageList.length]);
 
+  // Auto-scroll active thumbnail into center view
+  useEffect(() => {
+    if (thumbsRef.current && thumbsRef.current.children[activeImageIndex]) {
+      const activeEl = thumbsRef.current.children[activeImageIndex] as HTMLElement;
+      activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [activeImageIndex]);
+
+  // Mouse drag-to-scroll support for thumbnails
+  const isDraggingRef = useRef(false);
+  const startXRef = useRef(0);
+  const scrollLeftRef = useRef(0);
+  const hasMovedRef = useRef(false);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!thumbsRef.current) return;
+    isDraggingRef.current = true;
+    hasMovedRef.current = false;
+    startXRef.current = e.pageX - thumbsRef.current.offsetLeft;
+    scrollLeftRef.current = thumbsRef.current.scrollLeft;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingRef.current || !thumbsRef.current) return;
+    const x = e.pageX - thumbsRef.current.offsetLeft;
+    const walk = x - startXRef.current;
+    if (Math.abs(walk) > 4) {
+      hasMovedRef.current = true;
+      thumbsRef.current.scrollLeft = scrollLeftRef.current - walk;
+    }
+  };
+
+  const handleMouseUp = () => {
+    isDraggingRef.current = false;
+  };
+
   if (!project) return null;
 
   const waUrl = formatWhatsAppUrl(
@@ -123,7 +160,7 @@ export default function PortfolioModal({
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-5 sm:gap-7 items-start">
             {/* Left / Top Media: Auto-Adaptive Device Canvas + Thumbnails */}
-            <div className={isLandscape ? 'md:col-span-12' : 'md:col-span-5 flex flex-col items-center'}>
+            <div className={isLandscape ? 'md:col-span-12 min-w-0 w-full' : 'md:col-span-5 min-w-0 w-full flex flex-col items-center'}>
               {/* Main Featured Image */}
               <div
                 onClick={() => currentImage && setIsFullscreen(true)}
@@ -212,31 +249,55 @@ export default function PortfolioModal({
 
               {/* Horizontal Thumbnails Carousel (Strip Foto Banyak Sesuai Referensi) */}
               {imageList.length > 1 && (
-                <div className="w-full mt-3 flex items-center gap-2 overflow-x-auto pb-1.5 no-scrollbar justify-start sm:justify-center">
-                  {imageList.map((imgUrl, idx) => {
-                    const isActive = idx === activeImageIndex;
-                    return (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setActiveImageIndex(idx)}
-                        className={`relative shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden transition-all cursor-pointer ${
-                          isActive
-                            ? 'ring-2 ring-[#0B0F19] ring-offset-2 scale-105 shadow-sm opacity-100'
-                            : 'border border-black/[0.1] opacity-50 hover:opacity-100 hover:border-black/30'
-                        }`}
-                        aria-label={`Lihat screenshot ${idx + 1}`}
-                      >
-                        <Image
-                          src={imgUrl}
-                          alt={`${project.title} - Thumbnail ${idx + 1}`}
-                          fill
-                          className="object-cover object-top"
-                          sizes="60px"
-                        />
-                      </button>
-                    );
-                  })}
+                <div
+                  className={`mt-3.5 w-full ${
+                    isLandscape
+                      ? 'max-w-full'
+                      : 'max-w-[280px] sm:max-w-[320px] md:max-w-none md:w-full'
+                  } mx-auto`}
+                >
+                  {/* Thumbnail Scroll Container - Smooth Gesture Swiping */}
+                  <div
+                    ref={thumbsRef}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                    className={`flex items-center gap-1.5 sm:gap-2 py-1.5 px-0.5 overflow-x-auto no-scrollbar touch-pan-x overscroll-x-contain select-none cursor-grab active:cursor-grabbing ${
+                      imageList.length <= 6 ? 'justify-center' : 'justify-start'
+                    }`}
+                    style={{ WebkitOverflowScrolling: 'touch' }}
+                  >
+                    {imageList.map((imgUrl, idx) => {
+                      const isActive = idx === activeImageIndex;
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            if (!hasMovedRef.current) {
+                              setActiveImageIndex(idx);
+                            }
+                          }}
+                          className={`relative shrink-0 w-[40px] h-[40px] sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-lg sm:rounded-xl overflow-hidden transition-all cursor-pointer aspect-square ${
+                            isActive
+                              ? 'ring-2 ring-[#0B0F19] ring-offset-1 shadow-sm opacity-100'
+                              : 'border border-black/[0.1] opacity-50 hover:opacity-100 hover:border-black/30'
+                          }`}
+                          aria-label={`Lihat screenshot ${idx + 1}`}
+                        >
+                          <Image
+                            src={imgUrl}
+                            alt={`${project.title} - Thumbnail ${idx + 1}`}
+                            fill
+                            className="object-cover object-top pointer-events-none"
+                            sizes="48px"
+                          />
+                        </button>
+                      );
+                    })}
+                    {imageList.length > 6 && <div className="w-2 shrink-0" aria-hidden="true" />}
+                  </div>
                 </div>
               )}
             </div>

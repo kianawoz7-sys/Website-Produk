@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { X, Check, Clock, Shield, ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react';
 import { Product } from '@/lib/types';
@@ -21,6 +21,7 @@ export default function ProductModal({
   const [isLandscape, setIsLandscape] = useState<boolean | null>(null);
   const [imageRatios, setImageRatios] = useState<Record<string, boolean>>({});
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const thumbsRef = useRef<HTMLDivElement>(null);
 
   const imageList = useMemo(() => {
     if (!product) return [];
@@ -92,6 +93,42 @@ export default function ProductModal({
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [product, onClose, isFullscreen, imageList.length]);
+
+  // Auto-scroll active thumbnail into center view
+  useEffect(() => {
+    if (thumbsRef.current && thumbsRef.current.children[activeImageIndex]) {
+      const activeEl = thumbsRef.current.children[activeImageIndex] as HTMLElement;
+      activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [activeImageIndex]);
+
+  // Mouse drag-to-scroll support for thumbnails
+  const isDraggingRef = useRef(false);
+  const startXRef = useRef(0);
+  const scrollLeftRef = useRef(0);
+  const hasMovedRef = useRef(false);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!thumbsRef.current) return;
+    isDraggingRef.current = true;
+    hasMovedRef.current = false;
+    startXRef.current = e.pageX - thumbsRef.current.offsetLeft;
+    scrollLeftRef.current = thumbsRef.current.scrollLeft;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingRef.current || !thumbsRef.current) return;
+    const x = e.pageX - thumbsRef.current.offsetLeft;
+    const walk = x - startXRef.current;
+    if (Math.abs(walk) > 4) {
+      hasMovedRef.current = true;
+      thumbsRef.current.scrollLeft = scrollLeftRef.current - walk;
+    }
+  };
+
+  const handleMouseUp = () => {
+    isDraggingRef.current = false;
+  };
 
   if (!product) return null;
 
@@ -199,31 +236,55 @@ export default function ProductModal({
 
               {/* Thumbnail Strip */}
               {imageList.length > 1 && (
-                <div className="mt-3 w-full flex items-center justify-center gap-2 overflow-x-auto py-1 no-scrollbar">
-                  {imageList.map((imgUrl, idx) => {
-                    const isActive = idx === activeImageIndex;
-                    return (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setActiveImageIndex(idx)}
-                        className={`relative shrink-0 w-12 h-12 rounded-xl overflow-hidden transition-all cursor-pointer ${
-                          isActive
-                            ? 'ring-2 ring-[#0B0F19] ring-offset-2 scale-105 shadow-sm opacity-100'
-                            : 'border border-black/[0.08] opacity-50 hover:opacity-100 hover:border-black/25'
-                        }`}
-                        aria-label={`Pilih screenshot ${idx + 1}`}
-                      >
-                        <Image
-                          src={imgUrl}
-                          alt={`${product.name} - Thumbnail ${idx + 1}`}
-                          fill
-                          className="object-cover object-top"
-                          sizes="50px"
-                        />
-                      </button>
-                    );
-                  })}
+                <div
+                  className={`mt-3.5 w-full ${
+                    isLandscape
+                      ? 'max-w-full'
+                      : 'max-w-[280px] sm:max-w-[320px]'
+                  } mx-auto`}
+                >
+                  {/* Thumbnail Scroll Container - Smooth Gesture Swiping */}
+                  <div
+                    ref={thumbsRef}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                    className={`flex items-center gap-1.5 sm:gap-2 py-1.5 px-0.5 overflow-x-auto no-scrollbar touch-pan-x overscroll-x-contain select-none cursor-grab active:cursor-grabbing ${
+                      imageList.length <= 6 ? 'justify-center' : 'justify-start'
+                    }`}
+                    style={{ WebkitOverflowScrolling: 'touch' }}
+                  >
+                    {imageList.map((imgUrl, idx) => {
+                      const isActive = idx === activeImageIndex;
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            if (!hasMovedRef.current) {
+                              setActiveImageIndex(idx);
+                            }
+                          }}
+                          className={`relative shrink-0 w-[40px] h-[40px] sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-lg sm:rounded-xl overflow-hidden transition-all cursor-pointer aspect-square ${
+                            isActive
+                              ? 'ring-2 ring-[#0B0F19] ring-offset-1 shadow-sm opacity-100'
+                              : 'border border-black/[0.08] opacity-50 hover:opacity-100 hover:border-black/25'
+                          }`}
+                          aria-label={`Pilih screenshot ${idx + 1}`}
+                        >
+                          <Image
+                            src={imgUrl}
+                            alt={`${product.name} - Thumbnail ${idx + 1}`}
+                            fill
+                            className="object-cover object-top pointer-events-none"
+                            sizes="48px"
+                          />
+                        </button>
+                      );
+                    })}
+                    {imageList.length > 6 && <div className="w-2 shrink-0" aria-hidden="true" />}
+                  </div>
                 </div>
               )}
             </div>
