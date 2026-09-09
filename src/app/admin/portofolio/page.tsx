@@ -35,6 +35,8 @@ export default function AdminPortofolioPage() {
   const [description, setDescription] = useState('');
   const [featuresText, setFeaturesText] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [images, setImages] = useState<string[]>([]);
+  const [customImageUrlInput, setCustomImageUrlInput] = useState('');
   const [hasLiveUrl, setHasLiveUrl] = useState(false);
   const [liveUrl, setLiveUrl] = useState('');
   const [isFeatured, setIsFeatured] = useState(false);
@@ -82,6 +84,8 @@ export default function AdminPortofolioPage() {
     setDescription('');
     setFeaturesText('');
     setImageUrl('');
+    setImages([]);
+    setCustomImageUrlInput('');
     setHasLiveUrl(false);
     setLiveUrl('');
     setIsFeatured(false);
@@ -99,6 +103,14 @@ export default function AdminPortofolioPage() {
     setDescription(item.description || '');
     setFeaturesText((item.features || []).join('\n'));
     setImageUrl(item.image_url || '');
+    setImages(
+      item.images && Array.isArray(item.images) && item.images.length > 0
+        ? item.images
+        : item.image_url
+        ? [item.image_url]
+        : []
+    );
+    setCustomImageUrlInput('');
     setHasLiveUrl(item.has_live_url);
     setLiveUrl(item.live_url || '');
     setIsFeatured(item.is_featured);
@@ -116,28 +128,43 @@ export default function AdminPortofolioPage() {
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    if (images.length + files.length > 8) {
+      setMessage({ text: 'Maksimal 8 foto/screenshot per produk', type: 'error' });
+      return;
+    }
 
     setUploadingImage(true);
     try {
       const supabase = createClient();
-      const fileExt = file.name.split('.').pop();
-      const fileName = `portfolio-${Date.now()}.${fileExt}`;
-      const filePath = `portfolios/${fileName}`;
+      const uploadedUrls: string[] = [];
 
-      const { error: uploadError } = await supabase.storage
-        .from('public-images')
-        .upload(filePath, file);
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileExt = file.name.split('.').pop();
+        const fileName = `portfolio-${Date.now()}-${i}.${fileExt}`;
+        const filePath = `portfolios/${fileName}`;
 
-      if (uploadError) throw uploadError;
+        const { error: uploadError } = await supabase.storage
+          .from('public-images')
+          .upload(filePath, file);
 
-      const { data: publicUrlData } = supabase.storage
-        .from('public-images')
-        .getPublicUrl(filePath);
+        if (uploadError) throw uploadError;
 
-      setImageUrl(publicUrlData.publicUrl);
-      setMessage({ text: 'Mockup gambar berhasil diupload ke storage!', type: 'success' });
+        const { data: publicUrlData } = supabase.storage
+          .from('public-images')
+          .getPublicUrl(filePath);
+
+        uploadedUrls.push(publicUrlData.publicUrl);
+      }
+
+      setImages((prev) => [...prev, ...uploadedUrls]);
+      if (!imageUrl && uploadedUrls.length > 0) {
+        setImageUrl(uploadedUrls[0]);
+      }
+      setMessage({ text: `${uploadedUrls.length} screenshot berhasil diupload!`, type: 'success' });
     } catch (err: unknown) {
       setMessage({
         text: `Gagal upload gambar: ${(err as Error)?.message || 'Pastikan bucket public-images aktif di Supabase'}`,
@@ -145,7 +172,30 @@ export default function AdminPortofolioPage() {
       });
     } finally {
       setUploadingImage(false);
+      e.target.value = '';
     }
+  };
+
+  const handleAddCustomImageUrl = () => {
+    const trimmed = customImageUrlInput.trim();
+    if (!trimmed) return;
+    if (images.length >= 8) {
+      setMessage({ text: 'Maksimal 8 foto per produk', type: 'error' });
+      return;
+    }
+    setImages((prev) => [...prev, trimmed]);
+    if (!imageUrl) setImageUrl(trimmed);
+    setCustomImageUrlInput('');
+  };
+
+  const handleRemoveImage = (indexToRemove: number) => {
+    setImages((prev) => {
+      const filtered = prev.filter((_, idx) => idx !== indexToRemove);
+      if (imageUrl === prev[indexToRemove]) {
+        setImageUrl(filtered[0] || '');
+      }
+      return filtered;
+    });
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -157,13 +207,16 @@ export default function AdminPortofolioPage() {
       .map((s) => s.trim())
       .filter(Boolean);
 
+    const primaryImage = images[0] || imageUrl || null;
+
     const payload = {
       title,
       slug: slug.trim() || generateSlug(title),
       category,
       description,
       features: parsedFeatures,
-      image_url: imageUrl || null,
+      image_url: primaryImage,
+      images: images.length > 0 ? images : primaryImage ? [primaryImage] : [],
       has_live_url: hasLiveUrl,
       live_url: hasLiveUrl ? liveUrl.trim() : null,
       is_featured: isFeatured,
@@ -187,6 +240,7 @@ export default function AdminPortofolioPage() {
 
       setIsModalOpen(false);
       fetchPortfolios();
+      fetch('/api/revalidate', { method: 'POST' }).catch(() => {});
       setMessage({ text: 'Karya portofolio berhasil disimpan!', type: 'success' });
     } catch (err: unknown) {
       setMessage({
@@ -206,6 +260,7 @@ export default function AdminPortofolioPage() {
         if (error) throw error;
       }
       setPortfolios(portfolios.filter((p) => p.id !== id));
+      fetch('/api/revalidate', { method: 'POST' }).catch(() => {});
       setMessage({ text: 'Portofolio berhasil dihapus!', type: 'success' });
     } catch (err: unknown) {
       setMessage({ text: `Gagal menghapus: ${(err as Error)?.message}`, type: 'error' });
@@ -227,6 +282,7 @@ export default function AdminPortofolioPage() {
           item.id === p.id ? { ...item, is_visible: updatedVisible } : item
         )
       );
+      fetch('/api/revalidate', { method: 'POST' }).catch(() => {});
     } catch (err) {
       console.error(err);
     }
@@ -481,41 +537,88 @@ export default function AdminPortofolioPage() {
                 />
               </div>
 
-              {/* Upload Foto Mockup dengan Saran Format HP */}
-              <div className="p-3.5 rounded-[10px] bg-surface border border-black/[0.06] space-y-2">
+              {/* Upload Multi-Foto / Galeri Screenshot Fitur */}
+              <div className="p-3.5 rounded-[10px] bg-surface border border-black/[0.06] space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="block text-[13px] font-medium text-primary">
-                    Upload Foto / Mockup UI (Bucket: public-images)
+                    Galeri Foto / Screenshot Fitur ({images.length}/8)
                   </label>
                   <span className="text-[11px] font-semibold text-accent bg-white px-2 py-0.5 rounded-full border border-black/[0.04]">
-                    Disarankan: Rasio HP (9:16)
+                    Multi-Upload
                   </span>
                 </div>
                 <p className="text-[12px] text-muted leading-relaxed">
-                  💡 Tips: Ambil screenshot tampilan HP aplikasi Anda agar pas di frame smartphone Apple.
+                  💡 Tambahkan beberapa screenshot fitur penting (menu kasir, cetak struk, laporan, dll). Foto pertama otomatis jadi cover utama.
                 </p>
 
-                <div className="flex items-center gap-3 pt-1">
-                  <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-xs bg-white hover:bg-neutral-100 border border-black/[0.08] text-[13px] font-medium text-primary transition-colors">
+                {/* Upload Button & Direct URL Input */}
+                <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                  <label className="cursor-pointer inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xs bg-white hover:bg-neutral-100 border border-black/[0.08] text-[13px] font-medium text-primary transition-colors shrink-0">
                     <Upload className="w-4 h-4 text-accent" />
-                    <span>{uploadingImage ? 'Mengupload...' : 'Pilih Screenshot HP'}</span>
+                    <span>{uploadingImage ? 'Mengupload...' : 'Upload Foto (Bisa Pilih Banyak)'}</span>
                     <input
                       type="file"
                       accept="image/*"
+                      multiple
                       onChange={handleImageUpload}
                       disabled={uploadingImage}
                       className="hidden"
                     />
                   </label>
-                  {imageUrl && (
-                    <span className="text-[12px] text-emerald-600 font-medium inline-flex items-center gap-1">
-                      <Check className="w-3.5 h-3.5" /> Gambar terpasang
-                    </span>
-                  )}
+
+                  <div className="flex-1 flex gap-1.5">
+                    <input
+                      type="url"
+                      value={customImageUrlInput}
+                      onChange={(e) => setCustomImageUrlInput(e.target.value)}
+                      placeholder="Atau tempel URL gambar langsung..."
+                      className="flex-1 px-3 py-1.5 rounded-xs bg-white border border-black/[0.08] text-[12px] font-mono text-primary focus:border-accent focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCustomImageUrl}
+                      className="px-3 py-1.5 rounded-xs bg-[#0B0F19] hover:bg-black text-white text-[12px] font-medium transition-colors shrink-0"
+                    >
+                      Tambah
+                    </button>
+                  </div>
                 </div>
-                {imageUrl && (
-                  <div className="text-[11px] font-mono text-muted truncate">
-                    {imageUrl}
+
+                {/* Thumbnail Grid List */}
+                {images.length > 0 && (
+                  <div className="pt-2">
+                    <span className="block text-[11px] font-medium text-muted mb-2">
+                      Daftar Screenshot Terpasang:
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      {images.map((img, idx) => (
+                        <div
+                          key={idx}
+                          className="relative group rounded-lg overflow-hidden border border-black/[0.08] bg-white aspect-[4/3] flex items-center justify-center"
+                        >
+                          <Image
+                            src={img}
+                            alt={`Preview ${idx + 1}`}
+                            fill
+                            className="object-cover"
+                            sizes="120px"
+                          />
+                          {idx === 0 && (
+                            <span className="absolute top-1 left-1 bg-black/75 text-white text-[9px] font-bold px-1.5 py-0.5 rounded backdrop-blur-xs">
+                              Cover
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(idx)}
+                            className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center shadow transition-all opacity-80 group-hover:opacity-100"
+                            title="Hapus gambar ini"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

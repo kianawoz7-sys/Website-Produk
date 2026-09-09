@@ -50,6 +50,7 @@ create table if not exists products (
   show_price boolean not null default false,
   features jsonb not null default '[]'::jsonb,
   image_url text,
+  images jsonb not null default '[]'::jsonb,
   is_visible boolean not null default true,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
@@ -268,6 +269,7 @@ create table if not exists portfolios (
   description text,
   features jsonb not null default '[]'::jsonb,
   image_url text,
+  images jsonb not null default '[]'::jsonb,
   has_live_url boolean not null default false,
   live_url text,
   is_featured boolean not null default false,
@@ -340,3 +342,9 @@ create policy "public-images: admin can delete"
     bucket_id = 'public-images'
     and auth.role() = 'authenticated'
   );
+
+-- ---------------------------------------------------------
+-- MIGRATION HELPERS (For Existing Databases)
+-- ---------------------------------------------------------
+-- alter table public.products add column if not exists images jsonb not null default '[]'::jsonb;
+-- alter table public.portfolios add column if not exists images jsonb not null default '[]'::jsonb;

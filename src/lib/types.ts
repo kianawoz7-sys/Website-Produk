@@ -8,6 +8,7 @@ export interface Product {
   show_price: boolean;
   features?: string[] | null;
   image_url?: string | null;
+  images?: string[] | null;
   is_visible: boolean;
   sort_order: number;
   created_at?: string;
@@ -72,6 +73,7 @@ export interface PortfolioProject {
   description?: string | null;
   features?: string[] | null;
   image_url?: string | null;
+  images?: string[] | null;
   has_live_url: boolean;
   live_url?: string | null;
   is_featured: boolean;

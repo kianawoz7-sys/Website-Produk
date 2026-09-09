@@ -87,132 +87,14 @@ export default function PortfolioShowcase({
           ref={sliderRef}
           className="flex gap-6 sm:gap-8 md:gap-10 overflow-x-auto px-[calc((100vw-280px)/2)] sm:px-8 md:px-[max(1.5rem,calc((100vw-980px)/2))] snap-x snap-mandatory md:snap-none pb-6 pt-2 no-scrollbar scroll-smooth"
         >
-          {filteredPortfolios.map((item) => {
-            const waUrl = formatWhatsAppUrl(
-              whatsappNumber,
-              `Halo KyDev, saya tertarik dengan produk jadi / portofolio "${item.title}". Boleh minta info detail dan pemesanannya?`
-            );
-
-            return (
-              <div
-                key={item.id}
-                className="shrink-0 w-[280px] sm:w-[290px] md:w-[310px] snap-center md:snap-align-none flex flex-col justify-between"
-              >
-                {/* Bagian Atas: Media & Teks Alami Sesuai Screenshot Apple */}
-                <div>
-                  {/* Card Media: Aspek Rasio Portrait 9:16 - Interaktif Klik Membesar */}
-                  {/* Card Media: Neutral Stage Canvas (Mendukung HP 9:16 & Tablet/Web 16:9 tanpa kepotong) */}
-                  <div
-                    onClick={() => setSelectedProject(item)}
-                    className="relative w-full aspect-[4/5] rounded-[22px] bg-[#F8F9FA] overflow-hidden border border-black/[0.06] shadow-xs group transition-all cursor-pointer select-none flex items-center justify-center p-3.5"
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Lihat detail lengkap ${item.title}`}
-                  >
-                    {item.image_url ? (
-                      <div className="relative w-full h-full flex items-center justify-center">
-                        <Image
-                          src={item.image_url}
-                          alt={item.title}
-                          fill
-                          className="object-contain drop-shadow-sm group-hover:scale-[1.03] transition-transform duration-500"
-                          sizes="(max-width: 640px) 280px, 320px"
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-white rounded-xl text-primary">
-                        <Layers className="w-10 h-10 mb-2 text-[#2563EB]" />
-                        <span className="text-[14px] font-semibold">{item.title}</span>
-                        <span className="text-[11px] text-muted mt-1">Web & Aplikasi</span>
-                      </div>
-                    )}
-
-                    {/* Subtle hover overlay */}
-                    <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                      <span className="px-3 py-1.5 rounded-full bg-[#0B0F19]/80 backdrop-blur-md text-white text-[12px] font-medium flex items-center gap-1.5 shadow-md">
-                        <Maximize2 className="w-3.5 h-3.5" />
-                        Lihat Detail
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Category & Title ala Apple (Posisi tetap pas di bawah foto) */}
-                  <div className="mt-4">
-                    <span className="text-[12px] font-medium text-muted block mb-1">
-                      {item.category}
-                    </span>
-                    <h3
-                      onClick={() => setSelectedProject(item)}
-                      className="font-display text-[22px] font-semibold text-primary leading-tight tracking-tight hover:text-accent cursor-pointer transition-colors line-clamp-2"
-                    >
-                      {item.title}
-                    </h3>
-                  </div>
-
-                  {/* Deskripsi tetap di posisinya (menjauh/menurun secara natural jika teks banyak) */}
-                  <p className="text-[14px] text-muted mt-2 leading-relaxed line-clamp-3">
-                    {item.description}
-                  </p>
-
-                  {/* Fitur opsional ringkas */}
-                  {item.features && item.features.length > 0 && (
-                    <div className="mt-3 space-y-1">
-                      {item.features.slice(0, 2).map((feat, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center gap-2 text-[12px] text-body/80"
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full bg-muted/60 shrink-0" />
-                          <span className="truncate">{feat}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Bagian Bawah: Baris Tombol Selalu Sejajar Rata (Pinned to Bottom Baseline ala Apple) */}
-                <div className="mt-6 pt-2">
-                  <div className="flex items-center gap-3">
-                    {/* Tombol Utama: Selengkapnya */}
-                    <button
-                      onClick={() => setSelectedProject(item)}
-                      className="inline-flex items-center justify-center px-4 py-1.5 text-[13px] font-semibold text-white bg-[#0B0F19] hover:bg-black active:scale-[0.97] rounded-full transition-all shadow-xs"
-                    >
-                      <span>Selengkapnya</span>
-                    </button>
-
-                    {/* Tombol Sekunder Teks: Pesan */}
-                    <a
-                      href={waUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-0.5 text-[13px] font-semibold text-[#0B0F19] hover:text-[#2563EB] transition-colors"
-                    >
-                      <span>Pesan</span>
-                      <ChevronRight className="w-3.5 h-3.5 mt-0.5 stroke-[2.5]" />
-                    </a>
-                  </div>
-
-                  {/* Link Web jika ada link online: Rapi di baris bawah tombol */}
-                  <div className="mt-2.5 min-h-[20px]">
-                    {item.has_live_url && item.live_url ? (
-                      <a
-                        href={item.live_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted hover:text-primary transition-colors group"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5 text-accent" />
-                        <span className="hover:underline">Buka Website</span>
-                      </a>
-                    ) : (
-                      <span className="text-[12px] text-transparent select-none">.</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {filteredPortfolios.map((item) => (
+            <PortfolioCard
+              key={item.id}
+              item={item}
+              onSelect={setSelectedProject}
+              whatsappNumber={whatsappNumber}
+            />
+          ))}
         </div>
 
         {/* Apple Style Floating Circular Navigation Buttons (Persis Screenshot Referensi) */}
@@ -245,6 +127,129 @@ export default function PortfolioShowcase({
         />
       )}
     </section>
+  );
+}
+
+function PortfolioCard({
+  item,
+  onSelect,
+  whatsappNumber,
+}: {
+  item: PortfolioProject;
+  onSelect: (item: PortfolioProject) => void;
+  whatsappNumber: string;
+}) {
+  const waUrl = formatWhatsAppUrl(
+    whatsappNumber,
+    `Halo KyDev, saya tertarik dengan produk jadi / portofolio "${item.title}". Boleh minta info detail dan pemesanannya?`
+  );
+
+  return (
+    <div className="shrink-0 w-[280px] sm:w-[290px] md:w-[310px] snap-center md:snap-align-none flex flex-col justify-between">
+      {/* Bagian Atas: Media & Teks Alami */}
+      <div>
+        {/* Card Media Canvas */}
+        <div
+          onClick={() => onSelect(item)}
+          className="relative w-full aspect-[4/5] rounded-[22px] bg-[#F8F9FA] overflow-hidden border border-black/[0.06] shadow-xs group transition-all cursor-pointer select-none flex items-center justify-center p-3.5"
+          role="button"
+          tabIndex={0}
+          aria-label={`Lihat detail lengkap ${item.title}`}
+        >
+          {item.image_url ? (
+            <div className="relative w-full h-full flex items-center justify-center">
+              <Image
+                src={item.image_url}
+                alt={item.title}
+                fill
+                className="object-contain drop-shadow-sm group-hover:scale-[1.03] transition-transform duration-500"
+                sizes="(max-width: 640px) 280px, 320px"
+              />
+            </div>
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-white rounded-xl text-primary">
+              <Layers className="w-10 h-10 mb-2 text-[#2563EB]" />
+              <span className="text-[14px] font-semibold">{item.title}</span>
+              <span className="text-[11px] text-muted mt-1">Web & Aplikasi</span>
+            </div>
+          )}
+
+          {/* Hover Overlay */}
+          <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+            <span className="px-3 py-1.5 rounded-full bg-[#0B0F19]/80 backdrop-blur-md text-white text-[12px] font-medium flex items-center gap-1.5 shadow-md">
+              <Maximize2 className="w-3.5 h-3.5" />
+              Lihat Detail
+            </span>
+          </div>
+        </div>
+
+        {/* Category & Title */}
+        <div className="mt-4">
+          <span className="text-[12px] font-medium text-muted block mb-1">
+            {item.category}
+          </span>
+          <h3
+            onClick={() => onSelect(item)}
+            className="font-display text-[22px] font-semibold text-primary leading-tight tracking-tight hover:text-accent cursor-pointer transition-colors line-clamp-2"
+          >
+            {item.title}
+          </h3>
+        </div>
+
+        {/* Description */}
+        <p className="text-[14px] text-muted mt-2 leading-relaxed line-clamp-3">
+          {item.description}
+        </p>
+
+        {/* Features */}
+        {item.features && item.features.length > 0 && (
+          <div className="mt-3 space-y-1">
+            {item.features.slice(0, 2).map((feat, idx) => (
+              <div
+                key={idx}
+                className="flex items-center gap-2 text-[12px] text-body/80"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-muted/60 shrink-0" />
+                <span className="truncate">{feat}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Bagian Bawah: Buttons */}
+      <div className="mt-6 pt-2">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => onSelect(item)}
+            className="inline-flex items-center justify-center px-4 py-1.5 text-[13px] font-semibold text-white bg-[#0B0F19] hover:bg-black active:scale-[0.97] rounded-full transition-all shadow-xs"
+          >
+            Lihat Detail
+          </button>
+
+          <a
+            href={waUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center px-4 py-1.5 text-[13px] font-semibold text-[#0B0F19] bg-white hover:bg-[#F3F4F6] active:scale-[0.97] rounded-full transition-all border border-[#D1D5DB]"
+          >
+            Pesan
+          </a>
+
+          {item.has_live_url && item.live_url && (
+            <a
+              href={item.live_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 text-[#6B7280] hover:text-[#0B0F19] transition-colors ml-auto"
+              title="Kunjungi Website Langsung"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -17,8 +17,9 @@ import {
   getFeaturedPortfolio,
 } from '@/lib/data';
 
-// Keep page fast with Server Components & ISR
-export const revalidate = 60;
+// Real-time dynamic updates so changes in Admin CMS reflect instantly
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function HomePage() {
   const [settings, products, testimonials, faqs, services, portfolios, featuredProject] =

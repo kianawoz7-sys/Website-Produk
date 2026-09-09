@@ -42,6 +42,11 @@ export default function ProductCatalog({
         {/* Product Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {products.map((product) => {
+            const pImages = product.images && Array.isArray(product.images) && product.images.length > 0
+              ? product.images.filter(Boolean)
+              : (product.image_url ? [product.image_url] : []);
+            const coverImage = pImages[0] || product.image_url;
+
             const waUrl = formatWhatsAppUrl(
               whatsappNumber,
               getProductConsultationMessage(product.name)
@@ -54,10 +59,13 @@ export default function ProductCatalog({
               >
                 <div>
                   {/* Image thumbnail if present */}
-                  {product.image_url && (
-                    <div className="relative w-full h-[180px] sm:h-[220px] rounded-[10px] overflow-hidden bg-neutral-2/40 mb-6 group-hover:scale-[1.01] transition-transform">
+                  {coverImage && (
+                    <div
+                      onClick={() => setSelectedProduct(product)}
+                      className="relative w-full h-[180px] sm:h-[220px] rounded-[10px] overflow-hidden bg-neutral-2/40 mb-6 group-hover:scale-[1.01] transition-transform cursor-pointer"
+                    >
                       <Image
-                        src={product.image_url}
+                        src={coverImage}
                         alt={product.name}
                         fill
                         className="object-cover"

@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
-import { X, Check, ExternalLink, Layers, Maximize2 } from 'lucide-react';
+import { X, Check, ExternalLink, Layers, Maximize2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PortfolioProject } from '@/lib/types';
 import { formatWhatsAppUrl } from '@/lib/whatsapp';
 
@@ -18,15 +18,55 @@ export default function PortfolioModal({
   whatsappNumber = '6281234567890',
 }: PortfolioModalProps) {
   const [isLandscape, setIsLandscape] = useState<boolean | null>(null);
+  const [imageRatios, setImageRatios] = useState<Record<string, boolean>>({});
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
-  // Reset landscape state when project changes
+  // Extract all available images
+  const imageList = useMemo(() => {
+    if (!project) return [];
+    if (project.images && Array.isArray(project.images) && project.images.length > 0) {
+      return project.images.filter(Boolean);
+    }
+    if (project.image_url) {
+      return [project.image_url];
+    }
+    return [];
+  }, [project]);
+
+  // Reset state when project changes
   useEffect(() => {
+    setActiveImageIndex(0);
     setIsLandscape(null);
     setIsFullscreen(false);
   }, [project]);
 
-  // Close on Escape key press and freeze background scroll
+  // Auto-detect image ratio (landscape vs portrait) instantly with cache and preloader
+  const currentImage = imageList[activeImageIndex] || project?.image_url || null;
+  useEffect(() => {
+    if (!currentImage) return;
+    if (imageRatios[currentImage] !== undefined) {
+      setIsLandscape(imageRatios[currentImage]);
+      return;
+    }
+    const testImg = new window.Image();
+    testImg.src = currentImage;
+    if (testImg.complete && testImg.naturalWidth && testImg.naturalHeight) {
+      const landscape = testImg.naturalWidth > testImg.naturalHeight;
+      setIsLandscape(landscape);
+      setImageRatios((prev) => ({ ...prev, [currentImage]: landscape }));
+    } else {
+      testImg.onload = () => {
+        if (testImg.naturalWidth && testImg.naturalHeight) {
+          const landscape = testImg.naturalWidth > testImg.naturalHeight;
+          setIsLandscape(landscape);
+          setImageRatios((prev) => ({ ...prev, [currentImage]: landscape }));
+        }
+      };
+    }
+  }, [currentImage, imageRatios]);
+
+  // Keyboard navigation & Escape handler
   useEffect(() => {
     if (!project) return;
 
@@ -37,6 +77,10 @@ export default function PortfolioModal({
         } else {
           onClose();
         }
+      } else if (e.key === 'ArrowRight' && imageList.length > 1) {
+        setActiveImageIndex((prev) => (prev < imageList.length - 1 ? prev + 1 : 0));
+      } else if (e.key === 'ArrowLeft' && imageList.length > 1) {
+        setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : imageList.length - 1));
       }
     };
 
@@ -47,7 +91,7 @@ export default function PortfolioModal({
       document.body.style.overflow = 'unset';
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [project, onClose, isFullscreen]);
+  }, [project, onClose, isFullscreen, imageList.length]);
 
   if (!project) return null;
 
@@ -78,33 +122,79 @@ export default function PortfolioModal({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-5 sm:gap-7 items-start">
-            {/* Left / Top Media: Auto-Adaptive Device Canvas */}
-            <div className={isLandscape ? 'md:col-span-12' : 'md:col-span-5 flex justify-center'}>
+            {/* Left / Top Media: Auto-Adaptive Device Canvas + Thumbnails */}
+            <div className={isLandscape ? 'md:col-span-12' : 'md:col-span-5 flex flex-col items-center'}>
+              {/* Main Featured Image */}
               <div
-                onClick={() => project.image_url && setIsFullscreen(true)}
-                className={`relative group cursor-zoom-in overflow-hidden border border-black/[0.08] shadow-sm transition-all ${
+                onClick={() => currentImage && setIsFullscreen(true)}
+                className={`relative group cursor-zoom-in overflow-hidden border border-black/[0.08] shadow-md transition-all ${
                   isLandscape
-                    ? 'w-full aspect-[16/10] sm:aspect-[16/9] max-h-[340px] rounded-[16px] bg-[#0E0E10]'
-                    : 'w-[180px] h-[220px] sm:w-[210px] sm:h-[250px] md:w-full md:h-auto md:aspect-[9/15] rounded-[20px] bg-[#0E0E10]'
-                } flex items-center justify-center`}
+                    ? 'w-full aspect-[16/10] sm:aspect-[16/9] max-h-[380px] sm:max-h-[420px] rounded-[20px] bg-[#0E0E10]'
+                    : 'w-full max-w-[280px] sm:max-w-[320px] md:max-w-none md:w-full aspect-[9/16] md:aspect-[9/15] rounded-[24px] bg-[#0E0E10]'
+                } flex items-center justify-center p-1.5 sm:p-2`}
                 title="Klik untuk melihat layar penuh"
               >
-                {project.image_url ? (
+                {currentImage ? (
                   <>
                     <Image
-                      src={project.image_url}
-                      alt={project.title}
+                      key={currentImage}
+                      src={currentImage}
+                      alt={`${project.title} - Foto ${activeImageIndex + 1}`}
                       fill
-                      className="object-cover object-top group-hover:scale-[1.02] transition-transform duration-300"
-                      sizes="(max-width: 768px) 100vw, 700px"
+                      className="object-contain group-hover:scale-[1.01] transition-transform duration-300 drop-shadow-md"
+                      sizes="(max-width: 768px) 100vw, 750px"
                       priority
                       onLoad={(e) => {
                         const img = e.currentTarget;
                         if (img.naturalWidth && img.naturalHeight) {
-                          setIsLandscape(img.naturalWidth > img.naturalHeight);
+                          const landscape = img.naturalWidth > img.naturalHeight;
+                          setIsLandscape(landscape);
+                          if (currentImage) {
+                            setImageRatios((prev) => ({ ...prev, [currentImage]: landscape }));
+                          }
                         }
                       }}
                     />
+
+                    {/* Prev / Next Arrows on Main Image (if multiple images) */}
+                    {imageList.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveImageIndex((prev) =>
+                              prev > 0 ? prev - 1 : imageList.length - 1
+                            );
+                          }}
+                          className="absolute left-2 z-10 w-7 h-7 rounded-full bg-black/50 hover:bg-black/75 text-white flex items-center justify-center transition-all opacity-80 hover:opacity-100 backdrop-blur-sm"
+                          aria-label="Foto Sebelumnya"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveImageIndex((prev) =>
+                              prev < imageList.length - 1 ? prev + 1 : 0
+                            );
+                          }}
+                          className="absolute right-2 z-10 w-7 h-7 rounded-full bg-black/50 hover:bg-black/75 text-white flex items-center justify-center transition-all opacity-80 hover:opacity-100 backdrop-blur-sm"
+                          aria-label="Foto Selanjutnya"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
+
+                    {/* Photo Counter Badge */}
+                    {imageList.length > 1 && (
+                      <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-semibold">
+                        {activeImageIndex + 1} / {imageList.length}
+                      </div>
+                    )}
+
                     {/* Badge Tap to Zoom */}
                     <div className="absolute bottom-2.5 right-2.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[11px] font-medium flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                       <Maximize2 className="w-3 h-3" />
@@ -119,6 +209,36 @@ export default function PortfolioModal({
                   </div>
                 )}
               </div>
+
+              {/* Horizontal Thumbnails Carousel (Strip Foto Banyak Sesuai Referensi) */}
+              {imageList.length > 1 && (
+                <div className="w-full mt-3 flex items-center gap-2 overflow-x-auto pb-1.5 no-scrollbar justify-start sm:justify-center">
+                  {imageList.map((imgUrl, idx) => {
+                    const isActive = idx === activeImageIndex;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setActiveImageIndex(idx)}
+                        className={`relative shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden transition-all cursor-pointer ${
+                          isActive
+                            ? 'ring-2 ring-[#0B0F19] ring-offset-2 scale-105 shadow-sm opacity-100'
+                            : 'border border-black/[0.1] opacity-50 hover:opacity-100 hover:border-black/30'
+                        }`}
+                        aria-label={`Lihat screenshot ${idx + 1}`}
+                      >
+                        <Image
+                          src={imgUrl}
+                          alt={`${project.title} - Thumbnail ${idx + 1}`}
+                          fill
+                          className="object-cover object-top"
+                          sizes="60px"
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Right / Bottom: Full Details & Descriptions */}
@@ -185,30 +305,78 @@ export default function PortfolioModal({
         </div>
       </div>
 
-      {/* Fullscreen HD Lightbox Modal */}
-      {isFullscreen && project.image_url && (
+      {/* Fullscreen HD Lightbox Modal with Multi-Photo Navigation */}
+      {isFullscreen && currentImage && (
         <div
-          className="fixed inset-0 z-[10000] bg-black/95 flex flex-col items-center justify-center p-3 animate-fadeIn"
+          className="fixed inset-0 z-[10000] bg-black/95 flex flex-col items-center justify-center p-3 animate-fadeIn select-none"
           onClick={() => setIsFullscreen(false)}
         >
+          {/* Close Button */}
           <button
             onClick={() => setIsFullscreen(false)}
-            className="absolute top-4 right-4 z-10 w-11 h-11 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-colors shadow-lg"
+            className="absolute top-4 right-4 z-20 w-11 h-11 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-colors shadow-lg"
             aria-label="Tutup Fullscreen"
           >
             <X className="w-6 h-6" />
           </button>
-          <div className="relative w-full h-full max-w-[1200px] max-h-[90vh] flex items-center justify-center">
+
+          {/* Fullscreen Counter */}
+          {imageList.length > 1 && (
+            <div className="absolute top-5 left-5 z-20 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-white text-[12px] font-medium">
+              {activeImageIndex + 1} / {imageList.length}
+            </div>
+          )}
+
+          {/* Left / Right Nav in Fullscreen */}
+          {imageList.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveImageIndex((prev) =>
+                    prev > 0 ? prev - 1 : imageList.length - 1
+                  );
+                }}
+                className="absolute left-4 z-20 w-12 h-12 rounded-full bg-white/15 hover:bg-white/30 text-white flex items-center justify-center transition-all backdrop-blur-md"
+                aria-label="Foto Sebelumnya"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveImageIndex((prev) =>
+                    prev < imageList.length - 1 ? prev + 1 : 0
+                  );
+                }}
+                className="absolute right-4 z-20 w-12 h-12 rounded-full bg-white/15 hover:bg-white/30 text-white flex items-center justify-center transition-all backdrop-blur-md"
+                aria-label="Foto Selanjutnya"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            </>
+          )}
+
+          <div
+            className="relative w-full h-full max-w-[1200px] max-h-[85vh] flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
             <Image
-              src={project.image_url}
-              alt={project.title}
+              key={currentImage}
+              src={currentImage}
+              alt={`${project.title} - Fullscreen Foto ${activeImageIndex + 1}`}
               fill
               className="object-contain"
               sizes="100vw"
               priority
             />
           </div>
-          <p className="text-white/70 text-[12px] mt-2">Ketuk di mana saja untuk menutup</p>
+
+          <p className="text-white/70 text-[12px] mt-2">
+            Gunakan panah kiri/kanan untuk berganti foto • Ketuk tombol silang untuk menutup
+          </p>
         </div>
       )}
     </>

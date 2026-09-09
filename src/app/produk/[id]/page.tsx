@@ -1,11 +1,11 @@
 import React from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Check, Clock, Shield } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import FloatingWhatsApp from '@/components/FloatingWhatsApp';
+import ProductImageGallery from '@/components/ProductImageGallery';
 import { getProductById, getSiteSettings, getVisibleServices } from '@/lib/data';
 import { formatWhatsAppUrl, getProductConsultationMessage } from '@/lib/whatsapp';
 
@@ -27,6 +27,13 @@ export default async function ProductDetailPage({ params }: PageProps) {
   if (!product) {
     notFound();
   }
+
+  const productImages =
+    product.images && Array.isArray(product.images) && product.images.length > 0
+      ? product.images.filter(Boolean)
+      : product.image_url
+      ? [product.image_url]
+      : [];
 
   const waUrl = formatWhatsAppUrl(
     settings.whatsapp_number,
@@ -52,17 +59,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
           {/* Product Header Card */}
           <div className="bg-surface rounded-[16px] border border-black/[0.06] p-6 sm:p-10 mb-10">
-            {product.image_url && (
-              <div className="relative w-full h-[240px] sm:h-[340px] rounded-[12px] overflow-hidden bg-white mb-8">
-                <Image
-                  src={product.image_url}
-                  alt={product.name}
-                  fill
-                  className="object-cover"
-                  priority
-                />
-              </div>
-            )}
+            <ProductImageGallery images={productImages} title={product.name} />
 
             <div className="space-y-4">
               <span className="text-[12px] font-semibold text-accent uppercase tracking-wider block">

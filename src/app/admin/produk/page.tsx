@@ -24,6 +24,8 @@ export default function AdminProdukPage() {
   const [showPrice, setShowPrice] = useState(true);
   const [featuresText, setFeaturesText] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [images, setImages] = useState<string[]>([]);
+  const [customImageUrlInput, setCustomImageUrlInput] = useState('');
   const [isVisible, setIsVisible] = useState(true);
   const [sortOrder, setSortOrder] = useState<string | number>('1');
 
@@ -63,6 +65,8 @@ export default function AdminProdukPage() {
     setShowPrice(true);
     setFeaturesText('');
     setImageUrl('');
+    setImages([]);
+    setCustomImageUrlInput('');
     setIsVisible(true);
     setSortOrder(String(products.length + 1));
     setIsModalOpen(true);
@@ -75,10 +79,18 @@ export default function AdminProdukPage() {
     setSlug(p.slug || '');
     setShortDesc(p.short_description || '');
     setFullDesc(p.full_description || '');
-    setPrice(p.price ? p.price.toString() : '');
+    setPrice(p.price !== undefined && p.price !== null ? String(p.price) : '');
     setShowPrice(p.show_price);
     setFeaturesText((p.features || []).join('\n'));
     setImageUrl(p.image_url || '');
+    setImages(
+      p.images && Array.isArray(p.images) && p.images.length > 0
+        ? p.images
+        : p.image_url
+        ? [p.image_url]
+        : []
+    );
+    setCustomImageUrlInput('');
     setIsVisible(p.is_visible);
     setSortOrder(p.sort_order !== undefined ? String(p.sort_order) : '1');
     setIsModalOpen(true);
@@ -100,30 +112,43 @@ export default function AdminProdukPage() {
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    if (images.length + files.length > 8) {
+      setMessage({ text: 'Maksimal 8 foto per paket produk', type: 'error' });
+      return;
+    }
 
     setUploadingImage(true);
     try {
       const supabase = createClient();
-      const fileExt = file.name.split('.').pop();
-      const fileName = `product-${Date.now()}.${fileExt}`;
-      const filePath = `products/${fileName}`;
+      const uploadedUrls: string[] = [];
 
-      const { error: uploadError } = await supabase.storage
-        .from('public-images')
-        .upload(filePath, file);
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileExt = file.name.split('.').pop();
+        const fileName = `product-${Date.now()}-${i}.${fileExt}`;
+        const filePath = `products/${fileName}`;
 
-      if (uploadError) {
-        throw uploadError;
+        const { error: uploadError } = await supabase.storage
+          .from('public-images')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from('public-images')
+          .getPublicUrl(filePath);
+
+        uploadedUrls.push(publicUrlData.publicUrl);
       }
 
-      const { data: publicUrlData } = supabase.storage
-        .from('public-images')
-        .getPublicUrl(filePath);
-
-      setImageUrl(publicUrlData.publicUrl);
-      setMessage({ text: 'Gambar berhasil diupload ke storage!', type: 'success' });
+      setImages((prev) => [...prev, ...uploadedUrls]);
+      if (!imageUrl && uploadedUrls.length > 0) {
+        setImageUrl(uploadedUrls[0]);
+      }
+      setMessage({ text: `${uploadedUrls.length} foto berhasil diupload!`, type: 'success' });
     } catch (err: unknown) {
       setMessage({
         text: `Gagal upload gambar: ${(err as Error)?.message || 'Pastikan bucket public-images sudah dibuat di Supabase'}`,
@@ -131,7 +156,30 @@ export default function AdminProdukPage() {
       });
     } finally {
       setUploadingImage(false);
+      e.target.value = '';
     }
+  };
+
+  const handleAddCustomImageUrl = () => {
+    const trimmed = customImageUrlInput.trim();
+    if (!trimmed) return;
+    if (images.length >= 8) {
+      setMessage({ text: 'Maksimal 8 foto per produk', type: 'error' });
+      return;
+    }
+    setImages((prev) => [...prev, trimmed]);
+    if (!imageUrl) setImageUrl(trimmed);
+    setCustomImageUrlInput('');
+  };
+
+  const handleRemoveImage = (indexToRemove: number) => {
+    setImages((prev) => {
+      const filtered = prev.filter((_, idx) => idx !== indexToRemove);
+      if (imageUrl === prev[indexToRemove]) {
+        setImageUrl(filtered[0] || '');
+      }
+      return filtered;
+    });
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
@@ -143,6 +191,8 @@ export default function AdminProdukPage() {
       .map((s) => s.trim())
       .filter(Boolean);
 
+    const primaryImage = images[0] || imageUrl || null;
+
     const productPayload = {
       name,
       slug: slug.trim() || generateSlug(name),
@@ -151,7 +201,8 @@ export default function AdminProdukPage() {
       price: price ? parseFloat(price) : null,
       show_price: showPrice,
       features: parsedFeatures,
-      image_url: imageUrl || null,
+      image_url: primaryImage,
+      images: images.length > 0 ? images : primaryImage ? [primaryImage] : [],
       is_visible: isVisible,
       sort_order: sortOrder === '' ? 0 : Number(sortOrder),
     };
@@ -175,6 +226,7 @@ export default function AdminProdukPage() {
 
       setIsModalOpen(false);
       fetchProducts();
+      fetch('/api/revalidate', { method: 'POST' }).catch(() => {});
       setMessage({ text: 'Paket produk berhasil disimpan!', type: 'success' });
     } catch (err: unknown) {
       setMessage({
@@ -194,6 +246,7 @@ export default function AdminProdukPage() {
         if (error) throw error;
       }
       setProducts(products.filter((p) => p.id !== id));
+      fetch('/api/revalidate', { method: 'POST' }).catch(() => {});
       setMessage({ text: 'Produk berhasil dihapus!', type: 'success' });
     } catch (err: unknown) {
       setMessage({ text: `Gagal menghapus: ${(err as Error)?.message}`, type: 'error' });
@@ -215,6 +268,7 @@ export default function AdminProdukPage() {
           item.id === p.id ? { ...item, is_visible: updatedVisible } : item
         )
       );
+      fetch('/api/revalidate', { method: 'POST' }).catch(() => {});
     } catch (err) {
       console.error(err);
     }
@@ -498,32 +552,95 @@ export default function AdminProdukPage() {
                 />
               </div>
 
-              {/* Image Upload */}
-              <div>
-                <label className="block text-[13px] font-medium text-primary mb-1">
-                  Upload Gambar Paket (Bucket Storage: public-images)
-                </label>
-                <div className="flex items-center gap-3">
-                  <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-xs bg-surface hover:bg-neutral-2 border border-black/[0.08] text-[13px] font-medium text-primary transition-colors">
-                    <Upload className="w-4 h-4 text-accent" />
-                    <span>{uploadingImage ? 'Mengupload...' : 'Pilih File Gambar'}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      disabled={uploadingImage}
-                      className="hidden"
-                    />
+              {/* Image Upload & Multi-Photo Gallery Manager */}
+              <div className="space-y-3 p-3.5 rounded-[10px] bg-surface border border-black/[0.06]">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[13px] font-medium text-primary">
+                    Galeri Foto & Screenshot ({images.length}/8)
                   </label>
-                  {imageUrl && (
-                    <span className="text-[12px] text-emerald-600 font-medium inline-flex items-center gap-1">
-                      <Check className="w-3.5 h-3.5" /> Gambar terpasang
-                    </span>
-                  )}
+                  <span className="text-[11px] text-muted">
+                    Format: JPG, PNG, WEBP (Max 8 foto)
+                  </span>
                 </div>
-                {imageUrl && (
-                  <div className="mt-2 text-[11px] font-mono text-muted truncate max-w-full">
-                    {imageUrl}
+
+                {/* Upload Button + URL Input */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <label className={`cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-xs bg-white hover:bg-neutral-2 border border-black/[0.08] text-[13px] font-medium text-primary transition-colors ${uploadingImage ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <Upload className="w-4 h-4 text-accent" />
+                      <span>{uploadingImage ? 'Mengupload foto...' : '+ Upload File Foto'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleImageUpload}
+                        disabled={uploadingImage}
+                        className="hidden"
+                      />
+                    </label>
+                    <span className="text-[12px] text-muted">atau masukkan URL langsung di bawah:</span>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={customImageUrlInput}
+                      onChange={(e) => setCustomImageUrlInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddCustomImageUrl();
+                        }
+                      }}
+                      placeholder="https://images.unsplash.com/... atau link gambar web"
+                      className="flex-1 px-3.5 py-2 rounded-xs bg-white border border-black/[0.08] text-[13px] font-mono text-primary focus:border-accent focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCustomImageUrl}
+                      disabled={!customImageUrlInput.trim() || images.length >= 8}
+                      className="px-4 py-2 rounded-xs bg-primary hover:bg-black disabled:opacity-40 text-white text-[13px] font-medium transition-colors"
+                    >
+                      + Tambah
+                    </button>
+                  </div>
+                </div>
+
+                {/* Thumbnail Grid List */}
+                {images.length > 0 && (
+                  <div className="pt-2">
+                    <span className="block text-[11px] font-medium text-muted mb-2">
+                      Daftar Screenshot Terpasang:
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      {images.map((img, idx) => (
+                        <div
+                          key={idx}
+                          className="relative group rounded-lg overflow-hidden border border-black/[0.08] bg-white aspect-[4/3] flex items-center justify-center"
+                        >
+                          <Image
+                            src={img}
+                            alt={`Preview ${idx + 1}`}
+                            fill
+                            className="object-cover"
+                            sizes="120px"
+                          />
+                          {idx === 0 && (
+                            <span className="absolute top-1 left-1 bg-black/75 text-white text-[9px] font-bold px-1.5 py-0.5 rounded backdrop-blur-xs">
+                              Cover
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(idx)}
+                            className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center shadow transition-all opacity-80 group-hover:opacity-100"
+                            title="Hapus gambar ini"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
